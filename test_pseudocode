@@ -1,0 +1,58 @@
+Architecture Overview
+1-Data Ingestion: Use Apache Kafka for real-time data ingestion, capable of handling high volumes of data from various sources.
+
+2-Data Processing: Apache Spark for processing data. Spark can handle JSON, CSV, and Avro formats natively and supports complex transformations and aggregations.
+
+3-Data Storage: Apache Hadoop HDFS for raw data storage and Apache Hive or Google BigQuery for processed data storage, optimized for query performance.
+
+4-Monitoring and Error Handling: Use Elastic Stack (Elasticsearch, Logstash, Kibana) for logging and monitoring, and Apache Airflow for orchestration, which allows setting up alerting mechanisms based on data quality checks.
+
+1)Data Ingestion with Kafka Producer (Python pseudocode for JSON data):
+
+from kafka import KafkaProducer
+import json
+
+producer = KafkaProducer(bootstrap_servers=['localhost:9092'],
+                         value_serializer=lambda x: json.dumps(x).encode('utf-8'))
+
+data = {'ad_creative_id': '123', 'user_id': 'abc', 'timestamp': '2024-03-04T12:00:00', 'website': 'example.com'}
+producer.send('ad_impressions', value=data)
+producer.flush()
+
+2)Data Processing with Apache Spark:
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import count, countDistinct, col
+
+# Initialize SparkSession
+spark = SparkSession.builder.appName("AdvertiseXDataProcessing").getOrCreate()
+
+# Read ad impressions JSON data
+impressionsDF = spark.read.json("path/to/ad_impressions.json")
+
+# Read clicks/conversions CSV data
+clicksDF = spark.read.option("header", "true").csv("path/to/clicks.csv")
+
+# Data Transformation and Validation
+# Example: Filter out records with missing user IDs or timestamps
+impressionsDF = impressionsDF.filter((col("user_id").isNotNull()) & (col("timestamp").isNotNull()))
+clicksDF = clicksDF.filter((col("user_id").isNotNull()) & (col("event_timestamp").isNotNull()))
+
+# Deduplication
+# Assuming 'impression_id' and 'click_id' uniquely identify records in impressions and clicks data respectively
+impressionsDF = impressionsDF.dropDuplicates(["impression_id"])
+clicksDF = clicksDF.dropDuplicates(["click_id"])
+
+# Correlation Logic - Joining ad impressions with clicks based on user_id
+# Assuming clicksDF has a column 'campaign_id' corresponding to 'ad_campaign_id'
+joinedDF = impressionsDF.join(clicksDF, impressionsDF.user_id == clicksDF.user_id) \
+    .select(impressionsDF["user_id"], impressionsDF["timestamp"].alias("impression_timestamp"),
+            clicksDF["campaign_id"], clicksDF["event_timestamp"].alias("click_timestamp"))
+
+# Example Aggregation: Count total clicks and unique users per campaign
+campaignPerformance = joinedDF.groupBy("campaign_id") \
+    .agg(count("user_id").alias("total_clicks"), countDistinct("user_id").alias("unique_users"))
+
+campaignPerformance.show()
+
+# Save processed data to a desired format or storage, e.g., writing to a Hive table or saving as Parquet files
+# campaignPerformance.write.save("path/to/processed_data", format="parquet")
