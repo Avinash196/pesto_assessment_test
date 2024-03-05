@@ -1,3 +1,5 @@
+Due to tools unavailable and time frame giving overview of main process with following code snippets.
+
 Architecture Overview
 1-Data Ingestion: Use Apache Kafka for real-time data ingestion, capable of handling high volumes of data from various sources.
 
