@@ -43,9 +43,7 @@ campaignPerformance = joinedDF.groupBy("campaign_id") \
     .agg(count("user_id").alias("total_clicks"), countDistinct("user_id").alias("unique_users"))
 
 campaignPerformance.show()
-
-# Save processed data to a desired format or storage, e.g., writing to a Hive table or saving as Parquet files
-# campaignPerformance.write.save("path/to/processed_data", format="parquet")
+campaignPerformance.write.save("path/to/processed_data", format="parquet")
 -----------------------------------------------------------------------------------------------------------------------
 3)Data Storage and Query Performance:
   CREATE TABLE campaign_performance (ad_campaign_id STRING,total_clicks INT,unique_users INT)
