@@ -6,49 +6,37 @@ Architecture Overview
 3-Data Storage: Apache Hadoop HDFS for raw data storage and Apache Hive or Google BigQuery for processed data storage, optimized for query performance.
 
 4-Monitoring and Error Handling: Use Elastic Stack (Elasticsearch, Logstash, Kibana) for logging and monitoring, and Apache Airflow for orchestration, which allows setting up alerting mechanisms based on data quality checks.
-
+----------------------------------------------------------------------------------------------------------------------------------------------
 1)Data Ingestion with Kafka Producer (Python pseudocode for JSON data):
 
 from kafka import KafkaProducer
 import json
 
-producer = KafkaProducer(bootstrap_servers=['localhost:9092'],
-                         value_serializer=lambda x: json.dumps(x).encode('utf-8'))
-
+producer = KafkaProducer(bootstrap_servers=['localhost:9092'],value_serializer=lambda x: json.dumps(x).encode('utf-8'))
 data = {'ad_creative_id': '123', 'user_id': 'abc', 'timestamp': '2024-03-04T12:00:00', 'website': 'example.com'}
 producer.send('ad_impressions', value=data)
 producer.flush()
-
+----------------------------------------------------------------------------------------------------------------------------------------------
 2)Data Processing with Apache Spark:
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import count, countDistinct, col
-
-# Initialize SparkSession
 spark = SparkSession.builder.appName("AdvertiseXDataProcessing").getOrCreate()
 
-# Read ad impressions JSON data
 impressionsDF = spark.read.json("path/to/ad_impressions.json")
-
-# Read clicks/conversions CSV data
 clicksDF = spark.read.option("header", "true").csv("path/to/clicks.csv")
 
 # Data Transformation and Validation
-# Example: Filter out records with missing user IDs or timestamps
 impressionsDF = impressionsDF.filter((col("user_id").isNotNull()) & (col("timestamp").isNotNull()))
 clicksDF = clicksDF.filter((col("user_id").isNotNull()) & (col("event_timestamp").isNotNull()))
 
 # Deduplication
-# Assuming 'impression_id' and 'click_id' uniquely identify records in impressions and clicks data respectively
 impressionsDF = impressionsDF.dropDuplicates(["impression_id"])
 clicksDF = clicksDF.dropDuplicates(["click_id"])
 
 # Correlation Logic - Joining ad impressions with clicks based on user_id
-# Assuming clicksDF has a column 'campaign_id' corresponding to 'ad_campaign_id'
 joinedDF = impressionsDF.join(clicksDF, impressionsDF.user_id == clicksDF.user_id) \
     .select(impressionsDF["user_id"], impressionsDF["timestamp"].alias("impression_timestamp"),
             clicksDF["campaign_id"], clicksDF["event_timestamp"].alias("click_timestamp"))
-
-# Example Aggregation: Count total clicks and unique users per campaign
 campaignPerformance = joinedDF.groupBy("campaign_id") \
     .agg(count("user_id").alias("total_clicks"), countDistinct("user_id").alias("unique_users"))
 
@@ -56,3 +44,47 @@ campaignPerformance.show()
 
 # Save processed data to a desired format or storage, e.g., writing to a Hive table or saving as Parquet files
 # campaignPerformance.write.save("path/to/processed_data", format="parquet")
+-----------------------------------------------------------------------------------------------------------------------
+3)Data Storage and Query Performance:
+  CREATE TABLE campaign_performance (ad_campaign_id STRING,total_clicks INT,unique_users INT)
+  STORED AS PARQUET
+  LOCATION 'hdfs://path/to/campaign_performance';
+--------------------------------------------------------------------------------------------------------------------------
+4)Monitoring with Elastic Stack and Airflow (Pseudocode):
+  To create an Apache Airflow DAG for data quality checks, we need to define a Python function for our data quality logic and then set up an Airflow DAG that schedules and executes this function.
+  Data Quality Checks:
+    def data_quality_check():
+    from pyspark.sql import SparkSession
+    spark = SparkSession.builder.appName("DataQualityChecks").getOrCreate()
+    df = spark.read.parquet("path/to/processed_data")
+    if df.filter(df['id'].isNull()).count() > 0:
+        raise ValueError("Data quality check failed: Found null IDs")
+    record_count = df.count()
+    if record_count < 1000:  # Assuming a minimum expected count
+        raise ValueError(f"Data quality check failed: Record count is too low ({record_count})")
+    print("Data quality checks passed successfully.")
+------------------------------------------------------------------------------------------------------------------
+Airflow DAG for Data Quality Check:
+
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from airflow.utils.dates import days_ago
+
+default_args = {
+    'owner': 'airflow',
+    'depends_on_past': False,
+    'email_on_failure': False,
+    'email_on_retry': False,
+    'retries': 1,}
+
+with DAG(
+    'data_quality_check_dag',
+    default_args=default_args,
+    description='A DAG for data quality checks',
+    schedule_interval='@daily',
+    start_date=days_ago(1),
+    catchup=False) as dag:
+    run_data_quality_checks = PythonOperator(task_id='run_data_quality_checks',python_callable=data_quality_check)
+    run_data_quality_checks
+===========================================================================================================================
+   
