@@ -9,6 +9,9 @@ Architecture Overview
 
 4-Monitoring and Error Handling: Use Elastic Stack (Elasticsearch, Logstash, Kibana) for logging and monitoring, and Apache Airflow for orchestration, which allows setting up alerting mechanisms based on data quality checks.
 ----------------------------------------------------------------------------------------------------------------------------------------------
+
+CODE SNIPPETS :
+
 1)Data Ingestion with Kafka Producer (Python pseudocode for JSON data):
 
 from kafka import KafkaProducer
@@ -19,6 +22,7 @@ data = {'ad_creative_id': '123', 'user_id': 'abc', 'timestamp': '2024-03-04T12:0
 producer.send('ad_impressions', value=data)
 producer.flush()
 ----------------------------------------------------------------------------------------------------------------------------------------------
+
 2)Data Processing with Apache Spark:
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import count, countDistinct, col
@@ -45,11 +49,13 @@ campaignPerformance = joinedDF.groupBy("campaign_id") \
 campaignPerformance.show()
 campaignPerformance.write.save("path/to/processed_data", format="parquet")
 -----------------------------------------------------------------------------------------------------------------------
+
 3)Data Storage and Query Performance:
   CREATE TABLE campaign_performance (ad_campaign_id STRING,total_clicks INT,unique_users INT)
   STORED AS PARQUET
   LOCATION 'hdfs://path/to/campaign_performance';
 --------------------------------------------------------------------------------------------------------------------------
+
 4)Monitoring with Elastic Stack and Airflow (Pseudocode):
   To create an Apache Airflow DAG for data quality checks, we need to define a Python function for our data quality logic and then set up an Airflow DAG that schedules and executes this function.
   Data Quality Checks:
